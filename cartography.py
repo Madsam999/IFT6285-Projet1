@@ -30,10 +30,7 @@ class ACLCartographer:
     # Keywords for identifying classification types
     CLASSIFICATION_KEYWORDS = [
         'classification', 'classifier', 'categorization', 'labeling',
-        'sentiment analysis', 'sentiment classification', 
-        'text classification', 'document classification',
-        'binary classification', 'multi-class', 'multi-label',
-        'benchmark', 'dataset', 'corpus'
+        'sentiment analysis', 'multi-class', 'multi-label'
     ]
     
     # Classification types
@@ -89,7 +86,6 @@ class ACLCartographer:
                 'year': paper.year,
                 'authors': [str(author.full) if hasattr(author, 'full') else str(author) for author in paper.authors] if paper.authors else [],
                 'venue': str(paper.parent_volume.title) if hasattr(paper, 'parent_volume') and paper.parent_volume else "",
-                'url': f"https://aclanthology.org/{paper.id}/",
                 'citations': 0,  # Will be populated if available
             }
                 
@@ -488,13 +484,12 @@ def main():
         
         for idx, row in low_cited.iterrows():
             print(f"\n[{row['paper_id']}]")
-            print(f"  Title: {row.get('title', 'N/A')[:75]}")
+            print(f"  Title: {row.get('title', 'N/A')}")
             print(f"  Year: {row['year']} | Conf: {row['conference'].upper()} | Citations: {row['citations']}")
             print(f"  Types: {', '.join(row['classification_types'])}")
             print(f"  Domains: {', '.join(row['domains'])}")
             if row['benchmarks']:
                 print(f"  Benchmarks: {', '.join(row['benchmarks'][:5])}")
-            print(f"  URL: {row['url']}")
     else:
         print("\nNo classification papers found.")
     
