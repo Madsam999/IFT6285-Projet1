@@ -1,0 +1,45 @@
+ACL ANTHOLOGY CLASSIFICATION CARTOGRAPHY
+============================================================
+
+Total classification papers: 3613
+
+Papers by year:
+  2020: 664
+  2021: 531
+  2022: 722
+  2023: 447
+  2024: 669
+  2025: 580
+
+Papers by conference:
+  EMNLP: 980
+  ACL: 917
+  LREC: 638
+  COLING: 436
+  NAACL: 418
+  EACL: 188
+  CONLL: 36
+
+Classification types:
+  unspecified: 3246
+  multi-label: 180
+  binary: 167
+  multi-class: 71
+
+Domains:
+  ner: 1731
+  other: 1049
+  sentiment: 769
+  topic: 402
+  fake_news: 388
+  intent: 173
+  toxicity: 149
+  stance: 29
+
+Benchmarks:
+  Average per paper: 10.00
+  Total mentioned: 36130
+
+Citations:
+  Highly cited (>200): 0
+  Low cited (≤200): 3613
