@@ -1,5 +1,5 @@
 """
-ACL Anthology Classification Paper Cartography Script
+ACL Anthology Classification Paper Cartography Script (Optimized)
 
 This script collects and analyzes classification papers from
 ACL, NAACL, EACL, CoNLL, EMNLP, COLING and LREC conferences
@@ -7,10 +7,10 @@ ACL, NAACL, EACL, CoNLL, EMNLP, COLING and LREC conferences
 
 from acl_anthology import Anthology
 import pandas as pd
-from typing import List, Dict, Set
+from typing import List, Dict, Iterable, Optional
 from collections import defaultdict
+import unicodedata
 import re
-from datetime import datetime
 
 
 class ACLCartographer:
@@ -36,7 +36,7 @@ class ACLCartographer:
     # Classification types
     CLASSIFICATION_TYPES = {
         'binary': ['binary classification', 'binary', 'two-class'],
-        'multi-class': ['multi-class', 'multiclass', 'multiple classes'],
+        'multi-class': ['multi-class', 'multiclass', 'multiple classes', 'sentiment analysis'],
         'multi-label': ['multi-label', 'multilabel', 'multiple labels']
     }
     
@@ -67,23 +67,87 @@ class ACLCartographer:
         print("✓ Anthology loaded successfully")
         print(f"  Total volumes: {len(list(self.anthology.volumes()))}")
         
-    def _extract_paper_metadata(self, paper) -> Dict:
+        # Load benchmark data ONCE during initialization
+        self._benchmark_data = None
+        self._benchmark_loaded = False
+        
+        # Pre-compile regex patterns
+        self._metric_patterns = {
+            'accuracy': re.compile(r'accuracy[:\s]+(\d+\.?\d*)%?'),
+            'f1': re.compile(r'f1[:\s-]+(\d+\.?\d*)%?'),
+            'precision': re.compile(r'precision[:\s]+(\d+\.?\d*)%?'),
+            'recall': re.compile(r'recall[:\s]+(\d+\.?\d*)%?'),
+        }
+        
+    def _load_benchmark_data(self):
+        """Load benchmark data once and cache it"""
+        if self._benchmark_loaded:
+            return
+            
+        print("Loading benchmark data (one-time operation)...")
+        try:
+            df = pd.read_parquet(
+                "hf://datasets/pwc-archive/datasets/data/train-00000-of-00001.parquet"
+            )
+            
+            print(f"  Total datasets loaded: {len(df)}")
+            
+            # Filter to text-classification datasets only
+            mask = df.apply(self._contains_text_classification, axis=1)
+            self._benchmark_data = df[mask].copy()
+            
+            print(f"  Text classification datasets found: {len(self._benchmark_data)}")
+            
+            if len(self._benchmark_data) > 0:
+                # Pre-process benchmark names for faster matching
+                self._benchmark_data['all_names'] = self._benchmark_data.apply(
+                    lambda row: self._collect_name_aliases(row), axis=1
+                )
+                
+                # Show some example benchmark names
+                sample_names = self._benchmark_data['name'].head(10).tolist()
+                print(f"  Example benchmarks: {', '.join(sample_names[:5])}")
+            
+            print(f"  ✓ Loaded {len(self._benchmark_data)} text classification benchmarks")
+        except Exception as e:
+            print(f"  Warning: Could not load benchmark data: {e}")
+            import traceback
+            traceback.print_exc()
+            self._benchmark_data = pd.DataFrame()
+        
+        self._benchmark_loaded = True
+        
+    def _extract_paper_metadata(self, paper, year: int = None) -> Optional[Dict]:
         """
         Extract metadata from a paper object
         
         Args:
             paper: Paper object from acl-anthology
+            year: Year (if already known from volume)
             
         Returns:
             Dictionary with paper metadata
         """
         try:
+            # Use provided year if available, otherwise extract from paper
+            if year is None:
+                year = getattr(paper, 'year', None)
+                if year is None and hasattr(paper, 'parent_volume') and paper.parent_volume:
+                    year = getattr(paper.parent_volume, 'year', None)
+                
+                # Convert year to int if it's a string
+                if year is not None and isinstance(year, str):
+                    try:
+                        year = int(year)
+                    except (ValueError, TypeError):
+                        year = None
+            
             # Extract basic info
             metadata = {
                 'paper_id': str(paper.id),
                 'title': str(paper.title),
                 'abstract': str(paper.abstract) if paper.abstract else "",
-                'year': paper.year,
+                'year': year,
                 'authors': [str(author.full) if hasattr(author, 'full') else str(author) for author in paper.authors] if paper.authors else [],
                 'venue': str(paper.parent_volume.title) if hasattr(paper, 'parent_volume') and paper.parent_volume else "",
                 'citations': 0,  # Will be populated if available
@@ -108,11 +172,7 @@ class ACLCartographer:
         text = f"{paper.get('title', '')} {paper.get('abstract', '')}".lower()
         
         # Check if at least one keyword is present
-        for keyword in self.CLASSIFICATION_KEYWORDS:
-            if keyword.lower() in text:
-                return True
-                
-        return False
+        return any(keyword.lower() in text for keyword in self.CLASSIFICATION_KEYWORDS)
     
     def classify_paper_type(self, paper: Dict) -> List[str]:
         """
@@ -128,10 +188,8 @@ class ACLCartographer:
         types = []
         
         for type_name, keywords in self.CLASSIFICATION_TYPES.items():
-            for keyword in keywords:
-                if keyword.lower() in text:
-                    types.append(type_name)
-                    break
+            if any(keyword.lower() in text for keyword in keywords):
+                types.append(type_name)
                     
         return types if types else ['unspecified']
     
@@ -151,42 +209,163 @@ class ACLCartographer:
         for domain_name, keywords in self.DOMAINS.items():
             if domain_name == 'other':
                 continue
-            for keyword in keywords:
-                if keyword.lower() in text:
-                    domains.append(domain_name)
-                    break
+            if any(keyword.lower() in text for keyword in keywords):
+                domains.append(domain_name)
                     
         return domains if domains else ['other']
-    
+
+    def _normalize(self, s: str) -> str:
+        """Normalize string for matching"""
+        s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+        s = re.sub(r"[^a-zA-Z0-9]+", " ", s).strip().lower()
+        s = re.sub(r"\s+", " ", s)
+        return s
+
+    def _as_iter(self, x) -> Iterable[str]:
+        """Convert to iterable of strings"""
+        if x is None:
+            return []
+        if isinstance(x, str):
+            return [x]
+        try:
+            return [y for y in x if isinstance(y, str)]
+        except TypeError:
+            return []
+
+    def _contains_text_classification(self, row) -> bool:
+        """Check if row contains text classification task"""
+        # The 'tasks' column contains arrays of dictionaries like:
+        # [{'task': 'Text Classification', 'url': '...'}, ...]
+        
+        if 'tasks' not in row or row['tasks'] is None:
+            return False
+        
+        import numpy as np
+        tasks = row['tasks']
+        
+        # Handle numpy arrays
+        if isinstance(tasks, np.ndarray):
+            tasks = tasks.tolist()
+        
+        # Handle if it's not a list
+        if not isinstance(tasks, (list, tuple)):
+            tasks = [tasks]
+        
+        # Check each task
+        for task_item in tasks:
+            task_name = None
+            
+            # Extract task name from dictionary or string
+            if isinstance(task_item, dict):
+                task_name = task_item.get('task', '')
+            elif isinstance(task_item, str):
+                task_name = task_item
+            else:
+                continue
+            
+            if not task_name or not isinstance(task_name, str):
+                continue
+            
+            task_lower = task_name.lower()
+            
+            # Check for text classification related terms
+            if any(term in task_lower for term in [
+                'text classification', 
+                'sentiment',
+                'text categorization',
+                'document classification',
+                'topic classification',
+                'intent classification',
+                'multi label text classification',
+                'multi-label text classification',
+                'token classification',
+                'sequence classification'
+            ]):
+                return True
+        
+        return False
+
+    @staticmethod
+    def _collect_name_aliases(row) -> List[str]:
+        """Collect all name aliases for a benchmark"""
+        name_candidates = []
+        for c in ["name", "dataset", "display_name", "full_name", "pretty_name", "short_name", "slug"]:
+            if c in row and isinstance(row[c], str) and row[c].strip():
+                name_candidates.append(row[c].strip())
+
+        for c in ["aliases", "aka", "alternative_names"]:
+            if c in row and pd.notna(row[c]):
+                vals = row[c]
+                if isinstance(vals, str):
+                    vals = [v.strip() for v in vals.split(",") if v.strip()]
+                elif not isinstance(vals, list):
+                    vals = []
+                name_candidates.extend([v for v in vals if isinstance(v, str) and v.strip()])
+
+        # Deduplicate while preserving order
+        seen = set()
+        out = []
+        for n in name_candidates:
+            if n.lower() not in seen:
+                seen.add(n.lower())
+                out.append(n)
+        return out
+
     def extract_benchmarks(self, paper: Dict) -> List[str]:
         """
-        Extract mentioned benchmark names
-        
-        Args:
-            paper: Paper metadata dictionary
-            
-        Returns:
-            List of benchmarks
+        Return only the text-classification benchmarks that are explicitly mentioned
+        in the paper's title/abstract (case-insensitive, robust to punctuation).
         """
-        text = f"{paper.get('title', '')} {paper.get('abstract', '')}".upper()
-        benchmarks = []
+        # Ensure benchmark data is loaded
+        if not self._benchmark_loaded:
+            self._load_benchmark_data()
         
-        # Common benchmark patterns
-        benchmark_patterns = [
-            r'\b([A-Z]{3,}(?:-[A-Z0-9]+)?)\b',  # E.g., GLUE, SST-2
-            r'\b([A-Z][a-z]+(?:[A-Z][a-z]+)+)\b',  # E.g., SemEval, CoNLL
-        ]
+        if self._benchmark_data is None or len(self._benchmark_data) == 0:
+            return []
         
-        for pattern in benchmark_patterns:
-            matches = re.findall(pattern, text)
-            benchmarks.extend(matches)
+        # Build searchable text from paper
+        text = f"{paper.get('title', '')} {paper.get('abstract', '')}"
+        text_norm = self._normalize(text)
+
+        # Check each benchmark
+        mentioned = []
+        for _, row in self._benchmark_data.iterrows():
+            names = row.get('all_names', [])
+            if not names:
+                continue
+
+            primary = names[0]
+            found = False
             
-        # Filter common false positives
-        false_positives = {'THE', 'AND', 'FOR', 'WITH', 'FROM', 'ACL', 'NLP', 'AI', 
-                          'NER', 'POS', 'QA', 'MT', 'NLU', 'NLG', 'USA', 'UK'}
-        benchmarks = [b for b in benchmarks if b not in false_positives]
-        
-        return list(set(benchmarks))[:10]  # Limit to 10 benchmarks
+            for alias in names:
+                alias_clean = alias.strip()
+                if not alias_clean:
+                    continue
+
+                # Word boundary check
+                pat = r"\b" + re.escape(alias_clean) + r"\b"
+                if re.search(pat, text, flags=re.IGNORECASE):
+                    found = True
+                    break
+
+                # Normalized check
+                alias_norm = self._normalize(alias_clean)
+                if alias_norm and alias_norm in text_norm:
+                    found = True
+                    break
+
+            if found:
+                mentioned.append(primary)
+
+        # Deduplicate
+        seen = set()
+        out = []
+        for name in mentioned:
+            if name.lower() not in seen:
+                seen.add(name.lower())
+                out.append(name)
+
+        return out
     
     def extract_performance_metrics(self, paper: Dict) -> Dict:
         """
@@ -201,16 +380,8 @@ class ACLCartographer:
         abstract = paper.get('abstract', '').lower()
         metrics = {}
         
-        # Common metric patterns
-        metric_patterns = {
-            'accuracy': r'accuracy[:\s]+(\d+\.?\d*)%?',
-            'f1': r'f1[:\s-]+(\d+\.?\d*)%?',
-            'precision': r'precision[:\s]+(\d+\.?\d*)%?',
-            'recall': r'recall[:\s]+(\d+\.?\d*)%?',
-        }
-        
-        for metric_name, pattern in metric_patterns.items():
-            match = re.search(pattern, abstract)
+        for metric_name, pattern in self._metric_patterns.items():
+            match = pattern.search(abstract)
             if match:
                 metrics[metric_name] = float(match.group(1))
                 
@@ -230,54 +401,100 @@ class ACLCartographer:
         print(f"Period: {self.start_year}-{self.end_year}")
         print(f"Conferences: {', '.join(self.CONFERENCES.keys())}\n")
         
+        # Load benchmark data once before processing
+        self._load_benchmark_data()
+        
         all_papers = []
         volumes_checked = 0
         volumes_matched = 0
         papers_checked = 0
         
+        # Pre-compile volume ID patterns
+        # New format: 2020.acl-main
+        new_format_pattern = re.compile(r'\d{4}\.([a-z]+)')
+        # Old format: P07-1, A00-1, etc. - letter prefix indicates conference
+        old_format_pattern = re.compile(r'^([A-Z])\d{2}-')
+        
+        # Map old format letters to conferences
+        old_format_map = {
+            'P': 'acl',      # ACL (Proceedings)
+            'A': 'acl',      # ACL (Applied)  
+            'C': 'coling',   # COLING
+            'D': 'emnlp',    # EMNLP (Demonstrations)
+            'E': 'eacl',     # EACL
+            'N': 'naacl',    # NAACL
+            'H': 'naacl',    # HLT-NAACL
+            'W': None,       # Workshops (skip these)
+            'O': None,       # Other events (skip)
+            'J': None,       # Journal (skip)
+            'L': 'lrec',     # LREC
+            'I': None,       # IJCNLP (not in our list)
+            'S': None,       # Seminars (skip)
+            'T': None,       # Tutorials (skip)
+            'U': None,       # Unknown (skip)
+            'R': None,       # Resources (skip)
+            'Y': None,       # Other year-based (skip)
+        }
+        
+        # Flatten conference prefixes for faster lookup (new format)
+        conf_prefix_map = {}
+        for conf_key, conf_prefixes in self.CONFERENCES.items():
+            for prefix in conf_prefixes:
+                conf_prefix_map[prefix] = conf_key
+        
+        # Track year range found
+        years_found = set()
+        
         # Iterate through all volumes in the anthology
         for volume in self.anthology.volumes():
             volumes_checked += 1
-            volume_id = str(volume.full_id)
+            volume_id = str(volume.full_id)  # Get volume_id early for error handling
             
             # Check if this volume matches our criteria
             try:
-                # Extract year from volume ID (format: YYYY.conference-track)
-                year_match = re.match(r'(\d{4})\.([a-z]+)', volume_id)
-                if not year_match:
-                    continue
-                    
-                year = int(year_match.group(1))
-                conf_prefix = year_match.group(2)
+                # Get year directly from volume object
+                year = getattr(volume, 'year', None)
+                
+                # Convert year to int if it's a string
+                if isinstance(year, str):
+                    try:
+                        year = int(year)
+                    except (ValueError, TypeError):
+                        continue
                 
                 # Check if year is in range
-                if year < self.start_year or year > self.end_year:
+                if not (self.start_year <= year <= self.end_year):
                     continue
                 
-                # Check if conference is in our list
+                years_found.add(year)
+                
+                # Extract conference from volume ID (support both old and new formats)
                 conf_name = None
-                for conf_key, conf_prefixes in self.CONFERENCES.items():
-                    if conf_prefix in conf_prefixes:
-                        conf_name = conf_key
-                        break
+                
+                # Try new format first: 2020.acl-main
+                new_match = new_format_pattern.match(volume_id)
+                if new_match:
+                    conf_prefix = new_match.group(1)
+                    conf_name = conf_prefix_map.get(conf_prefix)
+                else:
+                    # Try old format: P07-1, A00-1, etc.
+                    old_match = old_format_pattern.match(volume_id)
+                    if old_match:
+                        letter_code = old_match.group(1)
+                        conf_name = old_format_map.get(letter_code)
                 
                 if not conf_name:
                     continue
                 
                 volumes_matched += 1
                 if debug and volumes_matched <= 3:
-                    print(f"  Processing volume: {volume_id}")
+                    print(f"  Processing volume: {volume_id} (year: {year})")
                 
                 # Process papers in this volume
                 volume_papers = 0
                 for paper in volume.papers():
                     papers_checked += 1
-                    paper_data = self._extract_paper_metadata(paper)
-                    
-                    if debug and volumes_matched <= 3 and volume_papers < 2:
-                        print(f"    Paper: {paper.id}")
-                        print(f"      Title: {paper_data.get('title', 'N/A')[:60] if paper_data else 'ERROR'}")
-                        print(f"      Has abstract: {bool(paper_data.get('abstract')) if paper_data else False}")
+                    paper_data = self._extract_paper_metadata(paper, year)  # Pass year from volume
                     
                     if paper_data and self.is_classification_paper(paper_data):
                         paper_data['conference'] = conf_name
@@ -302,7 +519,6 @@ class ACLCartographer:
         if all_papers:
             df = pd.DataFrame(all_papers)
         else:
-            # Create empty DataFrame with expected columns
             df = pd.DataFrame(columns=['paper_id', 'title', 'abstract', 'year', 'authors', 
                                       'venue', 'url', 'citations', 'conference', 
                                       'classification_types', 'domains', 'benchmarks', 
@@ -311,6 +527,7 @@ class ACLCartographer:
         print(f"\n{'='*60}")
         print(f"Debug stats:")
         print(f"  Total volumes checked: {volumes_checked}")
+        print(f"  Years found in range: {sorted(years_found) if years_found else 'None'}")
         print(f"  Volumes matched (year + conf): {volumes_matched}")
         print(f"  Total papers checked: {papers_checked}")
         print(f"  Classification papers found: {len(all_papers)}")
@@ -319,15 +536,7 @@ class ACLCartographer:
         return df
     
     def generate_statistics(self, df: pd.DataFrame) -> Dict:
-        """
-        Generate cartography statistics
-        
-        Args:
-            df: Papers DataFrame
-            
-        Returns:
-            Statistics dictionary
-        """
+        """Generate cartography statistics"""
         if len(df) == 0:
             return {
                 'total_papers': 0,
@@ -348,9 +557,9 @@ class ACLCartographer:
             'classification_types_dist': defaultdict(int),
             'domains_dist': defaultdict(int),
             'avg_benchmarks': df['num_benchmarks'].mean(),
-            'total_benchmarks': df['num_benchmarks'].sum(),
-            'highly_cited': len(df[df['citations'] > 200]),
-            'low_cited': len(df[df['citations'] <= 200]),
+            'total_benchmarks': int(df['num_benchmarks'].sum()),
+            'highly_cited': int(len(df[df['citations'] > 200])),
+            'low_cited': int(len(df[df['citations'] <= 200])),
         }
         
         # Type distribution
@@ -366,14 +575,7 @@ class ACLCartographer:
         return stats
     
     def save_results(self, df: pd.DataFrame, stats: Dict, filename: str = 'acl_cartography'):
-        """
-        Save results to files
-        
-        Args:
-            df: Papers DataFrame
-            stats: Statistics dictionary
-            filename: Base filename for output
-        """
+        """Save results to files"""
         # Save DataFrame
         df.to_csv(f'{filename}.csv', index=False, encoding='utf-8')
         df.to_json(f'{filename}.json', orient='records', indent=2, force_ascii=False)
@@ -432,8 +634,8 @@ def main():
     print("IFT6285 - Project 1")
     print("="*60)
     
-    # Initialize cartographer (2020-2025)
-    cartographer = ACLCartographer(start_year=2020, end_year=2025)
+    # Initialize cartographer (2010-2025)
+    cartographer = ACLCartographer(start_year=2010, end_year=2025)
     
     # Run cartography with debug mode
     df = cartographer.run_cartography(debug=True)
@@ -473,23 +675,6 @@ def main():
         # Save results
         cartographer.save_results(df, stats)
         
-        # Display top under-explored papers (low citations, good candidates for study)
-        print("\n" + "="*60)
-        print("TOP 15 UNDER-EXPLORED PAPERS (study candidates)")
-        print("Papers with ≤200 citations, sorted by most recent")
-        print("="*60)
-        
-        low_cited = df[df['citations'] <= 200].sort_values(['year', 'citations'], 
-                                                            ascending=[False, False]).head(15)
-        
-        for idx, row in low_cited.iterrows():
-            print(f"\n[{row['paper_id']}]")
-            print(f"  Title: {row.get('title', 'N/A')}")
-            print(f"  Year: {row['year']} | Conf: {row['conference'].upper()} | Citations: {row['citations']}")
-            print(f"  Types: {', '.join(row['classification_types'])}")
-            print(f"  Domains: {', '.join(row['domains'])}")
-            if row['benchmarks']:
-                print(f"  Benchmarks: {', '.join(row['benchmarks'][:5])}")
     else:
         print("\nNo classification papers found.")
     
