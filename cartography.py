@@ -51,6 +51,14 @@ class ACLCartographer:
         'ner': ['named entity', 'ner'],
         'other': []
     }
+
+    MODELS = {
+        'transformer': ['transformer', 'bert', 'roberta', 't5', 'gpt', 'xlnet', 'distilbert', 'electra', 'turing-nlg'],
+        'rnn/cnn': ['rnn', 'lstm', 'gru', 'convolutional neural network', 'cnn', 'recurrent neural network'],
+        'classical': ['svm', 'svc', 'linear regression', 'logistic regression', 'naive bayes', 'random forest', 'xgboost', 'lightgbm'],
+        'graph_based': ['graph neural network', 'gnn', 'graph attention network'],
+        'other_dl': ['attention mechanism', 'neural network', 'deep learning']
+    }
     
     def __init__(self, start_year: int = 2020, end_year: int = 2025):
         """
@@ -213,6 +221,21 @@ class ACLCartographer:
                 domains.append(domain_name)
                     
         return domains if domains else ['other']
+    
+    def classify_model_type(self, paper: Dict) -> List[str]:
+        """Identify the machine learning model/architecture used."""
+        text = f"{paper.get('title', '')} {paper.get('abstract', '')}".lower()
+        models = []
+        
+        for model_name, keywords in self.MODELS.items():
+            for keyword in keywords:
+                # Use a word boundary \b to prevent partial matches like 'roberts' -> 'bert'
+                pattern = r'\b' + re.escape(keyword) + r'\b'
+                if re.search(pattern, text):
+                    models.append(model_name)
+                    break
+                    
+        return list(set(models)) if models else ['unspecified']
 
     def _normalize(self, s: str) -> str:
         """Normalize string for matching"""
@@ -500,6 +523,7 @@ class ACLCartographer:
                         paper_data['conference'] = conf_name
                         paper_data['classification_types'] = self.classify_paper_type(paper_data)
                         paper_data['domains'] = self.classify_domain(paper_data)
+                        paper_data['model_types'] = self.classify_model_type(paper_data)
                         paper_data['benchmarks'] = self.extract_benchmarks(paper_data)
                         paper_data['num_benchmarks'] = len(paper_data['benchmarks'])
                         paper_data['performance'] = self.extract_performance_metrics(paper_data)
@@ -521,7 +545,7 @@ class ACLCartographer:
         else:
             df = pd.DataFrame(columns=['paper_id', 'title', 'abstract', 'year', 'authors', 
                                       'venue', 'url', 'citations', 'conference', 
-                                      'classification_types', 'domains', 'benchmarks', 
+                                      'classification_types', 'domains', "model_types", 'benchmarks', 
                                       'num_benchmarks', 'performance'])
         
         print(f"\n{'='*60}")
@@ -556,6 +580,7 @@ class ACLCartographer:
             'papers_by_conference': df['conference'].value_counts().to_dict(),
             'classification_types_dist': defaultdict(int),
             'domains_dist': defaultdict(int),
+            'models_dist': defaultdict(int),
             'avg_benchmarks': df['num_benchmarks'].mean(),
             'total_benchmarks': int(df['num_benchmarks'].sum()),
             'highly_cited': int(len(df[df['citations'] > 200])),
@@ -571,6 +596,10 @@ class ACLCartographer:
         for domains in df['domains']:
             for d in domains:
                 stats['domains_dist'][d] += 1
+
+        for model_types in df['model_types']:
+            for m in model_types:
+                stats['models_dist'][m] += 1
                 
         return stats
     
@@ -610,6 +639,17 @@ class ACLCartographer:
                 for domain, count in sorted(stats['domains_dist'].items(),
                                            key=lambda x: x[1], reverse=True):
                     f.write(f"  {domain}: {count}\n")
+
+                # --- NEW SECTION: Top Models/Architectures ---
+                f.write("\nTop Models/Architectures:\n")
+                model_dist = stats.get('models_dist', {})
+                if model_dist:
+                    for model_name, count in sorted(model_dist.items(), 
+                                                    key=lambda x: x[1], reverse=True):
+                        f.write(f"  {model_name}: {count}\n")
+                else:
+                    f.write("  (No model distribution data available)\n")
+                # --------------------------------------------
                 
                 f.write(f"\nBenchmarks:\n")
                 f.write(f"  Average per paper: {stats['avg_benchmarks']:.2f}\n")
