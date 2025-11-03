@@ -53,11 +53,13 @@ class ACLCartographer:
     }
 
     MODELS = {
-        'transformer': ['transformer', 'bert', 'roberta', 't5', 'gpt', 'xlnet', 'distilbert', 'electra', 'turing-nlg'],
-        'rnn/cnn': ['rnn', 'lstm', 'gru', 'convolutional neural network', 'cnn', 'recurrent neural network'],
-        'classical': ['svm', 'svc', 'linear regression', 'logistic regression', 'naive bayes', 'random forest', 'xgboost', 'lightgbm'],
-        'graph_based': ['graph neural network', 'gnn', 'graph attention network'],
-        'other_dl': ['attention mechanism', 'neural network', 'deep learning']
+        'transformer': ['transformer', 'bert', 'roberta', 't5', 'gpt', 'gpt-2', 'gpt-3', 'gpt-neo', 'gpt-j', 'gpt-4', 'mpnet', 'clip', 'vilt', 'visualbert', 'minilm', 'spanbert', 'llama', 'llama-2', 'llama-3', 'llama3', 'llama-3.1', 'llama-3.2', 'xlnet', 'distilbert', 'albert', 'electra', 'deberta', 'deberta-v3', 'ernie', 'ernie-2.0', 'bart', 'turing-nlg', 'self-attention', 'mistral', 'mixtral', 'xlm', 'xlm-r', 'longformer', 'bigbird'],
+        'rnn': ['rnn', 'gru', 'birnn', 'bigru', 'hrnn', 'rnn-crf', 'tree-rnn', 'gru-capsule','recurrent neural network'],
+        'cnn': ['cnn', 'convolutional neural network', 'tcn', 'textcnn', 'dcnn', 'rcnn'],
+        'lstm': ['lstm', 'ulmfit', 'elmo', 'flair embeddings', 'bi-lstm', 'bilstm', 'awd-lstm', 'han'],
+        'classical': ['svm', 'svc', 'linear regression', 'logistic regression', 'naive bayes', 'random forest', 'xgboost', 'lightgbm', 'gaussian mixture model', 'gmm', 'k-means', 'bayesian', 'clustering', 'decision tree',],
+        'graph_based': ['graph', 'gnn', 'gcn', 'gat', 'hgat', 'h-gnn', 'r-gcn', 'textgcn', 'graphsage', 'hypergraph'],
+        'other_dl': ['autoencoder', 'deep learning', 'gan', 'vae', 'mixture of experts', 'neural network', 'adversarial network', 'routing network', 'energy-based model', 'mlp', 'feedforward network']
     }
     
     def __init__(self, start_year: int = 2020, end_year: int = 2025):
@@ -234,7 +236,7 @@ class ACLCartographer:
                 if re.search(pattern, text):
                     models.append(model_name)
                     break
-                    
+        
         return list(set(models)) if models else ['unspecified']
 
     def _normalize(self, s: str) -> str:
