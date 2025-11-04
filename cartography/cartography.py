@@ -31,23 +31,23 @@ class ACLCartographer:
     # Keywords for identifying classification types
     CLASSIFICATION_KEYWORDS = [
         'classification', 'classifier', 'categorization', 'labeling',
-        'sentiment analysis', 'multi-class', 'multi-label'
+        'sentiment analysis', 'multi-class', 'multiclass', 'multi-label'
     ]
     
     # Classification types
     CLASSIFICATION_TYPES = {
         'binary': [
             'binary classification', 'binary', 'two-class', 'yes/no', 'positive vs negative',
-            'sentiment polarity', 'spam detection', 'fake news detection'
+            'sentiment polarity', 'spam', 'fake news', 'toxic', 'toxicity'
         ],
         'multi-class': [
             'multi-class', 'multiclass', 'multiple classes', 'topic classification',
             'intent classification', 'emotion classification', 'aspect classification',
-            'category classification', 'stance detection', 'relation classification'
+            'category classification', 'stance detection', 'multiple categories', 'predicted class', 'class prediction', 'categories'
         ],
         'multi-label': [
             'multi-label', 'multilabel', 'multiple labels', 'hierarchical classification',
-            'multi-topic classification', 'joint classification'
+            'multi-topic classification', 'joint classification', 'labeling', 'labels'
         ]
     }
 
@@ -221,7 +221,7 @@ class ACLCartographer:
                 types.append('multi-class')
             elif 'classification' in text and any(k in text for k in ['binary', 'yes/no', 'positive']):
                 types.append('binary')
-                        
+
         return types if types else ['unspecified']
     
     def classify_domain(self, paper: Dict) -> List[str]:
