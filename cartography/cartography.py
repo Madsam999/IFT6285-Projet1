@@ -11,6 +11,7 @@ from typing import List, Dict, Iterable, Optional
 from collections import defaultdict
 import unicodedata
 import re
+import numpy as np
 
 
 class ACLCartographer:
@@ -35,10 +36,21 @@ class ACLCartographer:
     
     # Classification types
     CLASSIFICATION_TYPES = {
-        'binary': ['binary classification', 'binary', 'two-class'],
-        'multi-class': ['multi-class', 'multiclass', 'multiple classes', 'sentiment analysis'],
-        'multi-label': ['multi-label', 'multilabel', 'multiple labels']
+        'binary': [
+            'binary classification', 'binary', 'two-class', 'yes/no', 'positive vs negative',
+            'sentiment polarity', 'spam detection', 'fake news detection'
+        ],
+        'multi-class': [
+            'multi-class', 'multiclass', 'multiple classes', 'topic classification',
+            'intent classification', 'emotion classification', 'aspect classification',
+            'category classification', 'stance detection', 'relation classification'
+        ],
+        'multi-label': [
+            'multi-label', 'multilabel', 'multiple labels', 'hierarchical classification',
+            'multi-topic classification', 'joint classification'
+        ]
     }
+
     
     # Classification domains
     DOMAINS = {
@@ -200,7 +212,16 @@ class ACLCartographer:
         for type_name, keywords in self.CLASSIFICATION_TYPES.items():
             if any(keyword.lower() in text for keyword in keywords):
                 types.append(type_name)
-                    
+
+        # --- Heuristic fallback ---
+        if not types:
+            if 'classification' in text and any(
+                k in text for k in ['sentiment', 'topic', 'intent', 'emotion', 'stance', 'aspect']
+            ):
+                types.append('multi-class')
+            elif 'classification' in text and any(k in text for k in ['binary', 'yes/no', 'positive']):
+                types.append('binary')
+                        
         return types if types else ['unspecified']
     
     def classify_domain(self, paper: Dict) -> List[str]:
@@ -265,7 +286,6 @@ class ACLCartographer:
         if 'tasks' not in row or row['tasks'] is None:
             return False
         
-        import numpy as np
         tasks = row['tasks']
         
         # Handle numpy arrays
