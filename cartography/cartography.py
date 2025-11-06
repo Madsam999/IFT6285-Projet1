@@ -54,11 +54,11 @@ class ACLCartographer:
     
     # Classification domains
     DOMAINS = {
-        'sentiment': ['sentiment', 'opinion', 'polarity', 'emotion'],
+        'sentiment': ['sentiment', 'opinion', 'polarity', 'emotion', 'review', 'emotional'],
         'topic': ['topic', 'subject', 'category'],
         'intent': ['intent', 'intention'],
-        'stance': ['stance detection'],
-        'toxicity': ['toxic', 'hate speech', 'offensive'],
+        'stance': ['stance detection', 'interpretation', 'opinion'],
+        'toxicity': ['toxicity','toxic', 'hate speech', 'offensive'],
         'fake_news': ['fake news', 'misinformation', 'fact'],
         'ner': ['named entity', 'ner'],
         'other': []
@@ -71,7 +71,7 @@ class ACLCartographer:
         'lstm': ['lstm', 'ulmfit', 'elmo', 'flair embeddings', 'bi-lstm', 'bilstm', 'awd-lstm', 'han'],
         'classical': ['svm', 'svc', 'linear regression', 'logistic regression', 'naive bayes', 'random forest', 'xgboost', 'lightgbm', 'gaussian mixture model', 'gmm', 'k-means', 'bayesian', 'clustering', 'decision tree',],
         'graph_based': ['graph', 'gnn', 'gcn', 'gat', 'hgat', 'h-gnn', 'r-gcn', 'textgcn', 'graphsage', 'hypergraph'],
-        'other_dl': ['autoencoder', 'deep learning', 'gan', 'vae', 'mixture of experts', 'neural network', 'adversarial network', 'routing network', 'energy-based model', 'mlp', 'feedforward network']
+        'other_dl': ['autoencoder', 'deep learning', 'gan', 'vae', 'mixture of experts', 'neural network', 'adversarial network', 'routing network', 'energy-based model', 'mlp', 'feedforward network', 'deep neural']
     }
     
     def __init__(self, start_year: int = 2020, end_year: int = 2025):
