@@ -25,7 +25,8 @@ class ACLCartographer:
         'conll': ['conll'],
         'emnlp': ['emnlp'],
         'coling': ['coling'],
-        'lrec': ['lrec']
+        'lrec': ['lrec'],
+        "findings": ["findings"]
     }
     
     # Keywords for identifying classification types
@@ -697,7 +698,7 @@ def main():
     print("="*60)
     
     # Initialize cartographer (2010-2025)
-    cartographer = ACLCartographer(start_year=2010, end_year=2025)
+    cartographer = ACLCartographer(start_year=1965, end_year=2025)
     
     # Run cartography with debug mode
     df = cartographer.run_cartography(debug=True)

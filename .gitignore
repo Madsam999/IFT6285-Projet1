@@ -6,4 +6,6 @@
 *.synctex.gz
 *.json
 *.csv
-.txt
+*.txt
+*.png
+dev

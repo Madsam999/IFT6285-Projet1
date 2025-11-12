@@ -1,26 +1,20 @@
-from acl_anthology import Anthology as ant
-from scholarly import scholarly as sch
-import sys
-import codecs
+from acl_anthology import Anthology
+import pandas as pd
+from typing import List, Dict, Set
+from collections import defaultdict
+import re
+from datetime import datetime
 
-sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
-sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
-
-
+MIN_YEAR = 2010
 def main():
+    volumeId = "2020.acl-main"
 
-    anthology = ant.from_repo()
+    anthology = Anthology.from_repo()
 
-    paperId = "P16-1004"
-    paper = anthology.get(paperId)
-    
-    paperName = str(paper.title)
-    print(paperName)
+    volume = anthology.get_volume(volumeId)
 
-    search = sch.search_pubs(paperName)
-    print(next(search)["num_citations"])
-
-    print("Hello world")
+    print(volume.year)
 
 if __name__ == "__main__":
     main()
+    

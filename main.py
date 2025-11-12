@@ -4,7 +4,7 @@ def main():
     print("hello world")
 
         # Initialize cartographer (2020-2025)
-    cartographer = ACLCartographer(2010, 2025)
+    cartographer = ACLCartographer(1965, 2025)
     
     # Run cartography with debug mode
     df = cartographer.run_cartography(debug=True)
