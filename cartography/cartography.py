@@ -335,18 +335,9 @@ class ACLCartographer:
     def _collect_name_aliases(row) -> List[str]:
         """Collect all name aliases for a benchmark"""
         name_candidates = []
-        for c in ["name", "dataset", "display_name", "full_name", "pretty_name", "short_name", "slug"]:
+        for c in ["name", "full_name"]:
             if c in row and isinstance(row[c], str) and row[c].strip():
                 name_candidates.append(row[c].strip())
-
-        for c in ["aliases", "aka", "alternative_names"]:
-            if c in row and pd.notna(row[c]):
-                vals = row[c]
-                if isinstance(vals, str):
-                    vals = [v.strip() for v in vals.split(",") if v.strip()]
-                elif not isinstance(vals, list):
-                    vals = []
-                name_candidates.extend([v for v in vals if isinstance(v, str) and v.strip()])
 
         # Deduplicate while preserving order
         seen = set()
