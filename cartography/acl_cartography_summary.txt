@@ -1,0 +1,92 @@
+ACL ANTHOLOGY CLASSIFICATION CARTOGRAPHY
+============================================================
+
+Total classification papers: 7370
+
+Papers by year:
+  1965: 2
+  1967: 1
+  1969: 1
+  1973: 1
+  1985: 1
+  1987: 1
+  1988: 1
+  1990: 4
+  1991: 8
+  1992: 8
+  1993: 2
+  1994: 5
+  1996: 8
+  1997: 3
+  1998: 12
+  1999: 6
+  2000: 15
+  2001: 4
+  2002: 20
+  2003: 11
+  2004: 39
+  2005: 19
+  2006: 79
+  2007: 34
+  2008: 120
+  2009: 43
+  2010: 141
+  2011: 23
+  2012: 127
+  2013: 35
+  2014: 165
+  2015: 76
+  2016: 286
+  2017: 198
+  2018: 391
+  2019: 461
+  2020: 765
+  2021: 637
+  2022: 941
+  2023: 825
+  2024: 960
+  2025: 891
+
+Papers by conference:
+  EMNLP: 1539
+  ACL: 1437
+  FINDINGS: 1406
+  LREC: 1202
+  COLING: 766
+  NAACL: 698
+  EACL: 286
+  CONLL: 36
+
+Classification types:
+  unspecified: 3665
+  multi-label: 1949
+  multi-class: 1570
+  binary: 540
+
+Domains:
+  ner: 3117
+  other: 2482
+  sentiment: 1723
+  topic: 763
+  fake_news: 665
+  stance: 411
+  intent: 286
+  toxicity: 218
+
+Top Models/Architectures:
+  unspecified: 4878
+  transformer: 1335
+  other_dl: 703
+  graph_based: 375
+  classical: 310
+  lstm: 188
+  cnn: 139
+  rnn: 95
+
+Benchmarks:
+  Average per paper: 1.03
+  Total mentioned: 7578
+
+Citations:
+  Highly cited (>200): 0
+  Low cited (≤200): 7370
